@@ -1,0 +1,7 @@
+/papers
+/.venv
+/.vscode
+.env
+paper_mover.py
+rotation.py
+tester.py
