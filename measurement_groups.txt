@@ -1,0 +1,27 @@
+Aerosols
+Lightning Detection
+Atmospheric Humidity Fields
+Liquid water OR precipitation rate
+Atmospheric Temperature Fields
+Ozone
+Atmospheric Winds
+Radiation budget
+Cloud particle properties OR Cloud particle profile
+Trace gases
+Cloud type OR Cloud amount OR cloud top temperature
+Albedo OR reflectance
+Soil moisture
+Inland Waters
+Surface temperature
+Landscape topography
+Vegetation
+Multi-purpose imagery
+Ocean topography OR Ocean currents
+Ocean color OR Ocean biology
+Ocean wave height OR Ocean wave spectrum
+Ocean Salinity
+Ocean surface winds
+Ice sheet topography
+Sea ice cover OR Sea ice edge OR Sea ice thickness
+Snow depth OR Snow cover
+Gravity measurements OR Magnetic measurements OR Geodynamic measurements
