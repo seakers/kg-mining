@@ -3,15 +3,13 @@
 extracted_pdf_texts/
 papers/
 papers_for_rag/
+pdf_vector_store/index.faiss
+pickled_rag_objects/embeddings*.pkl
 relation_mining_output/
 share_papers/
 .env
 relation-miner.py
-relation-miner-dani.py
-paper_mover.py
-rotation.py
 tester.py
-desktop.ini
 CEOS.xlsx
 summary_embeddings.pkl
 summary_masks.pkl

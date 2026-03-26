@@ -9,14 +9,16 @@ import os
 import random
 import pickle
 import time
+import tiktoken
 
 load_dotenv()
 
-def answer_queries(response_file):
+def answer_queries(model_name, filename, sample_size):
+
     vectorstore= FAISS.load_local("pdf_vector_store", embeddings=OpenAIEmbeddings(api_key=os.getenv("API_KEY"), model="text-embedding-3-large"), allow_dangerous_deserialization=True)
     retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
     #llm = ChatOpenAI(model="gpt-5", api_key=os.getenv("API_KEY"))
-    llm = ChatOllama(model="gemma3:27b", temperature=0.3)
+    llm = ChatOllama(model=model_name, temperature=0.3)
 
     def format_docs(docs):
         return "\n\n".join(doc.page_content for doc in docs)
@@ -51,21 +53,36 @@ def answer_queries(response_file):
     responses = {}
 
     try:
-        with open(f"responses/{response_file}.pkl", "rb") as file:
+        with open(f"responses/{filename}.pkl", "rb") as file:
             responses = pickle.load(file)
 
     except FileNotFoundError:
-        print(f"No current {response_file}.pkl in responses/ folder available to load.")
+        print(f"No current {filename}.pkl in responses/ folder available to load.")
 
     answered_queries = responses.keys()
     with open("queries.txt", "r", encoding='utf-8') as file:
         content = file.read()
     
     lines = content.split("A sensor is of type")
-    lines = random.sample(lines, 100)
+    lines = random.sample(lines, sample_size)
+
+    # llama_encoding = tiktoken.encoding_for_model("gpt-4")
+    # len_main = len(llama_encoding.encode(main))
+    # average = 0
 
     start = time.time()
+    print(f"Starting inference for LLM and RAG LLM model for {model_name}")
     for line in lines:
+
+        # query_tokens = llama_encoding.encode(line)
+        # average += len(query_tokens) + len_main
+
+        # docs = retriever.invoke(line)
+        # for i, doc in enumerate(docs):
+
+        #     text = doc.page_content
+        #     average += len(llama_encoding.encode(text))
+            
         inter_start = time.time()
         if inter_start - start > 3600:
             print("TIMEOUT - started queries at {start}, this query started at {inter_start}")
@@ -83,29 +100,36 @@ def answer_queries(response_file):
             llm_result = llm.invoke(messages)
             responses[query]["llm"] = llm_result.text
         
-        print(f"{time.time()-inter_start}\n")
+        print(f"Time for query: {time.time()-inter_start}")
 
+    # print(f"Total tokens for all queries: {average}")    
+    # average /= len(lines)
+    # print(f"Average tokens per query: {average}")
+    # exit()
 
-    with open("responses.pkl", "wb") as file:
+    with open(f"responses/{filename}.pkl", "wb") as file:
         pickle.dump(responses,file)
 
 
-def read_responses(response_file):
+def read_responses(filename):
+
     responses = {}
-    with open(f"responses/{response_file}.pkl", "rb") as file:
+    with open(f"responses/{filename}.pkl", "rb") as file:
         responses = pickle.load(file)
 
     incorrect_rag = 0
     incorrect_llm = 0
     total = 0
     for query in responses.keys():
+
         if "llm" in responses[query].keys():
             total += 1
+
             if "tertiary" in responses[query]["answer"].lower()[:10]:
                 incorrect_rag += 1
                 print(f"Query - {query}")
                 print(f"RAG Response - {responses[query]['answer']}")
-                #print(responses[query]["context"])
+                print(responses[query]["context"])
             
             if "tertiary" in responses[query]["llm"].lower()[:10]:
                 incorrect_llm += 1
@@ -116,6 +140,12 @@ def read_responses(response_file):
 
 
 if __name__ == "__main__":
-    response_file = "responses_gpt-5"
-    #answer_queries(response_file)
-    read_responses(response_file)
+
+    model_name = "gemma3:4b"
+    filename = model_name.replace(":", "-")
+    print(f"Using responses/{filename}.pkl")
+
+    sample_size=50
+
+    answer_queries(model_name, filename, sample_size)
+    read_responses(filename)

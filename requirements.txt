@@ -18,8 +18,8 @@ faiss-cpu==1.13.2
 fonttools==4.61.1
 frozenlist==1.8.0
 greenlet==3.3.1
-h11==0.14.0
-httpcore==1.0.6
+h11
+httpcore
 httpx==0.27.2
 httpx-sse==0.4.3
 idna==3.10
@@ -80,7 +80,6 @@ sortedcontainers==2.4.0
 sortgs==1.0.7
 soupsieve==2.8.1
 SQLAlchemy==2.0.46
-structured-logprobs==0.1.5
 tenacity==9.1.2
 tiktoken==0.12.0
 tqdm==4.66.5
@@ -94,7 +93,7 @@ urllib3==2.6.2
 uuid_utils==0.14.0
 webdriver-manager==4.0.2
 websocket-client==1.9.0
-wsproto==1.3.2
+wsproto
 xxhash==3.6.0
 yarl==1.22.0
 zstandard==0.25.0
