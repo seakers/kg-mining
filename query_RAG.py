@@ -5,17 +5,19 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
+from typing import Dict, Any
+
 import os
 import random
 import pickle
 import time
-import tiktoken
+import requests
 
 load_dotenv()
 
 def answer_queries(model_name, filename, sample_size):
 
-    vectorstore= FAISS.load_local("pdf_vector_store", embeddings=OpenAIEmbeddings(api_key=os.getenv("API_KEY"), model="text-embedding-3-large"), allow_dangerous_deserialization=True)
+    vectorstore= FAISS.load_local("pdf_vector_store", embeddings=OpenAIEmbeddings(api_key=os.getenv("OPENAI_API_KEY"), model="text-embedding-3-large"), allow_dangerous_deserialization=True)
     retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
     #llm = ChatOpenAI(model="gpt-5", api_key=os.getenv("API_KEY"))
     llm = ChatOllama(model=model_name, temperature=0.3)
@@ -27,9 +29,9 @@ def answer_queries(model_name, filename, sample_size):
         docs = retriever.invoke(question)
         return {"context": format_docs(docs), "question": question, "source_documents": docs}
     
-    main = """
-                The question will describe and instrument and ask if the instrument is capable of performing a measurement.
-                If one of the main purposes of this instrument is to perform the measurement we will categorize it as "Primary".
+    main =  """
+                You will be given a question that describes an instrument and asks if the instrument is capable of performing a measurement.
+                If one of the main purposes of this instrument is to perform the measurement, we will categorize it as "Primary".
                 If this instrument can perform the measurement but is not best suited for the job or is not commonly used, we will categorize it as "Secondary".
                 If this instrument cannot be used to perform the measurement, we will categorize it as "Tertiary".
                 Answer the question by responding with the appropriate category label for the instrument with an explanation of your response afterwards given your prior knowledge and the context provided.
@@ -71,44 +73,36 @@ def answer_queries(model_name, filename, sample_size):
     # average = 0
 
     start = time.time()
-    print(f"Starting inference for LLM and RAG LLM model for {model_name}")
-    for line in lines:
+    print(f"Starting inference for LLM and RAG LLM model for {model_name}. Number of queries = {sample_size}")
+    try:
+        for line in lines:
 
-        # query_tokens = llama_encoding.encode(line)
-        # average += len(query_tokens) + len_main
+            inter_start = time.time()
+            # if inter_start - start > 3600:
+            #     print("TIMEOUT - started queries at {start}, this query started at {inter_start}")
+            #     break
 
-        # docs = retriever.invoke(line)
-        # for i, doc in enumerate(docs):
+            query="A sensor is of type "+line.strip()
+            messages = [("system","You are an Earth Science expert validating the capabilities of measurement devices on Earth Observation satellites."),
+                        ("human",f"{main}\n Question:{query}"),]
 
-        #     text = doc.page_content
-        #     average += len(llama_encoding.encode(text))
+            if query not in answered_queries:
+                rag_result = rag_chain.invoke(query)
+                llm_result = llm.invoke(messages)
+                responses[query] = {"answer":rag_result["answer"], "context":rag_result["context"], "llm":llm_result.text}
+            elif "llm" not in responses[query].keys():
+                llm_result = llm.invoke(messages)
+                responses[query]["llm"] = llm_result.text
             
-        inter_start = time.time()
-        if inter_start - start > 3600:
-            print("TIMEOUT - started queries at {start}, this query started at {inter_start}")
-            break
+            print(f"Time for query: {time.time()-inter_start}")
 
-        query="A sensor is of type "+line.strip()
-        messages = [("system","You are an Earth Science expert validating the capabilities of measurement devices on Earth Observation satellites."),
-                    ("human",f"{main}\n Question:{query}"),]
+    except KeyboardInterrupt:
+        print(f"User interupted RAG/LLM query.")
 
-        if query not in answered_queries:
-            rag_result = rag_chain.invoke(query)
-            llm_result = llm.invoke(messages)
-            responses[query] = {"answer":rag_result["answer"], "context":rag_result["context"], "llm":llm_result.text}
-        elif "llm" not in responses[query].keys():
-            llm_result = llm.invoke(messages)
-            responses[query]["llm"] = llm_result.text
-        
-        print(f"Time for query: {time.time()-inter_start}")
-
-    # print(f"Total tokens for all queries: {average}")    
-    # average /= len(lines)
-    # print(f"Average tokens per query: {average}")
-    # exit()
-
+    print(f"Saving stored responses to responses/{filename}.pkl")
     with open(f"responses/{filename}.pkl", "wb") as file:
         pickle.dump(responses,file)
+
 
 
 def read_responses(filename):
@@ -125,15 +119,22 @@ def read_responses(filename):
         if "llm" in responses[query].keys():
             total += 1
 
-            if "tertiary" in responses[query]["answer"].lower()[:10]:
+            if "tertiary" in responses[query]["answer"].lower()[:100]:
                 incorrect_rag += 1
                 print(f"Query - {query}")
-                print(f"RAG Response - {responses[query]['answer']}")
-                print(responses[query]["context"])
+                #print(responses[query]["context"])
+                #print(f"RAG Response - {responses[query]['answer']}")
             
-            if "tertiary" in responses[query]["llm"].lower()[:10]:
-                incorrect_llm += 1
-                print(f"LLM response - {responses[query]['llm']}")
+                if "tertiary" in responses[query]["llm"].lower()[:100]:
+                    
+                    incorrect_llm += 1
+                    print(f"LLM response (incorrect) - {responses[query]['llm']}")
+                
+                else:
+                    pass
+                    #print(f"LLM response (correct) - {responses[query]['llm']}")
+            
+                print("-"*225)
     
     print(f"Incorrect RAG responses = {incorrect_rag}/{total}")
     print(f"Incorrect Zero-shot responses = {incorrect_llm}/{total}")
@@ -142,10 +143,11 @@ def read_responses(filename):
 if __name__ == "__main__":
 
     model_name = "gemma3:4b"
+    #model_name = "gpt-5"
     filename = model_name.replace(":", "-")
     print(f"Using responses/{filename}.pkl")
 
-    sample_size=50
+    sample_size=300
 
-    answer_queries(model_name, filename, sample_size)
+    #answer_queries(model_name, filename, sample_size)
     read_responses(filename)
